@@ -10,6 +10,7 @@ import requests
 from datetime import datetime
 
 #openai.api_key = "sk-proj-"
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 OPENWEATHER_API_KEY = "fa977f2964c89bf890b1502681dfa742"
 
 system_prompt_llm = """Sos un asesor técnico agrónomo digital que trabaja para Quampo...

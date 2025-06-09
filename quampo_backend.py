@@ -8,10 +8,10 @@ import os
 from google.colab import files
 import requests
 from datetime import datetime
+from openai import OpenAI
 
 # 🔐 Configurar tu API Key de OpenAI
-openai.api_key = "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"  # Reemplazá con tu API Key válida
-
+ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 # 🌦 API Key de OpenWeatherMap
 OPENWEATHER_API_KEY = "fa977f2964c89bf890b1502681dfa742"
 
@@ -185,9 +185,8 @@ def generar_informe(prom, fecha, cultivo, ubicacion, tipo, fecha_siembra):
     return "\n".join(resumen)
 
 # 🤖 Informe GPT
+
 def generar_informe_llm(informe):
-  
-    client = openai.OpenAI(api_key="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")
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[

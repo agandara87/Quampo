@@ -106,9 +106,10 @@ def generar_informe(prom, fecha, cultivo, ubicacion, tipo, fecha_siembra):
 
 def generar_informe_llm(informe):
     response = openai.chat.completions.create(
-    model="gpt-4o",
-    messages=[
-        {"role": "system", "content": system_prompt_llm},
-        {"role": "user", "content": f"..."}
-    ]
-)
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt_llm},
+            {"role": "user", "content": f"Este es el informe técnico:\n\n{informe}\n\nRedactá un informe agronómico claro y profesional para el productor."}
+        ]
+    )
+    return response.choices[0].message.content.strip()

@@ -37,11 +37,19 @@ if uploaded_file:
         st.subheader("🤖 Informe agronómico profesional")
         st.markdown(generar_informe_llm(informe))
 
-        # Mostrar imagen NDVI
+        # Mostrar mapa NDVI real o estimado
         if "NDVI" in idx:
             fig, ax = plt.subplots()
             im = ax.imshow(idx["NDVI"], cmap="RdYlGn")
             ax.axis("off")
             plt.colorbar(im, ax=ax)
             st.subheader("🖼 Mapa NDVI")
+            st.pyplot(fig)
+        elif "NDVI_orientativo" in idx:
+            fig, ax = plt.subplots()
+            im = ax.imshow(idx["NDVI_orientativo"], cmap="RdYlGn")
+            ax.axis("off")
+            plt.colorbar(im, ax=ax)
+            st.subheader("🖼 Mapa NDVI (Estimado RGB)")
+            st.warning("Este NDVI fue estimado usando solo las bandas RGB. Es solo una orientación, no diagnóstico real.")
             st.pyplot(fig)

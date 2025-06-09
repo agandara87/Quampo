@@ -8,6 +8,7 @@ import os
 import requests
 from datetime import datetime
 from openai import OpenAI
+import rasterio
 
 # 🔐 Configurar tu API Key de OpenAI
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -84,39 +85,72 @@ def calcular_evi(img): return 2.5 * (img[:,:,0] - img[:,:,2]) / (img[:,:,0] + 6 
 def calcular_gndvi(img): return (img[:,:,0] - img[:,:,1]) / (img[:,:,0] + img[:,:,1] + 1e-5)
 
 # 🛰 Procesamiento de imagen
+import rasterio
+import numpy as np
+
 def procesar_imagen(path):
-    img = cv2.imread(path, -1)
+    with rasterio.open(path) as src:
+        bandas = src.count
+        nombres = src.descriptions  # nombres de las bandas (si están)
 
-    if img is None:
-        raise ValueError("No se pudo cargar la imagen")
+        print(f"📷 Imagen con {bandas} bandas.")
+        if nombres:
+            print("🧾 Bandas detectadas:", nombres)
+        else:
+            print("⚠️ No hay descripciones de bandas disponibles.")
 
-    if len(img.shape) < 3:
-        raise ValueError("La imagen no tiene suficientes bandas")
+        # Leer todas las bandas
+        img = src.read()  # shape: (bandas, altura, ancho)
 
-    bandas = img.shape[2]
+        # Normalizar a formato (altura, ancho, bandas)
+        img = np.transpose(img, (1, 2, 0))
+
     tipo = "Multiespectral" if bandas > 3 else "RGB"
-    print(f"📷 Tipo de imagen detectado: {tipo} ({bandas} bandas)")
 
-    red = img[:, :, 2].astype(float)
-    green = img[:, :, 1].astype(float)
-    blue = img[:, :, 0].astype(float)
+    # Heurística para usar bandas
+    red = img[:, :, 2].astype(float) if bandas >= 3 else None
+    green = img[:, :, 1].astype(float) if bandas >= 2 else None
+    blue = img[:, :, 0].astype(float) if bandas >= 1 else None
+    nir = img[:, :, 3].astype(float) if bandas >= 4 else None  # Asumimos que banda 4 = NIR, salvo que se detecte otra
 
-    nir = img[:, :, 3].astype(float) if tipo == "Multiespectral" else None
+    # Si hay descripciones, intentamos mapear más exactamente
+    if nombres and "nir" in "".join(n.lower() for n in nombres if n):
+        for idx, name in enumerate(nombres):
+            if name and "nir" in name.lower():
+                nir = img[:, :, idx].astype(float)
+                print(f"✅ Banda NIR detectada en la posición {idx+1}")
+                break
 
     indices = {}
     promedios = {}
 
-    if nir is not None:
+    if nir is not None and red is not None:
         ndvi = (nir - red) / (nir + red + 1e-5)
-        if np.nanmax(ndvi) > 1.5 or np.nanmin(ndvi) < -1.5:
-            print("⚠️ NDVI fuera de rango (-1 a 1). ¿Estás usando una imagen válida con banda NIR?")
         indices["NDVI"] = ndvi
         promedios["NDVI"] = float(np.nanmean(ndvi))
-    else:
-        print("⚠️ Imagen RGB detectada. Se calculará NDVI orientativo sin banda NIR.")
-        ndvi_est = (green - red) / (green + red + 1e-5)  # NDVI aproximado usando bandas RGB
+    elif green is not None and red is not None:
+        print("⚠️ NDVI estimado con bandas RGB (sin NIR)")
+        ndvi_est = (green - red) / (green + red + 1e-5)
         indices["NDVI_orientativo"] = ndvi_est
         promedios["NDVI_orientativo"] = float(np.nanmean(ndvi_est))
+
+    # Otros índices
+    if red is not None and green is not None and blue is not None:
+        evi = 2.5 * (blue - red) / (blue + 6 * red - 7.5 * green + 1e-5)
+        ndwi = (green - blue) / (green + blue + 1e-5)
+        savi = 1.5 * (red - blue) / (red + blue + 0.5)
+        gndvi = (green - red) / (green + red + 1e-5)
+
+        indices.update({"EVI": evi, "NDWI": ndwi, "SAVI": savi, "GNDVI": gndvi})
+        promedios.update({
+            "EVI": float(np.nanmean(evi)),
+            "NDWI": float(np.nanmean(ndwi)),
+            "SAVI": float(np.nanmean(savi)),
+            "GNDVI": float(np.nanmean(gndvi))
+        })
+
+    return promedios, indices, tipo
+)
 
     # Otros índices (se pueden calcular igual con RGB)
     evi = 2.5 * (blue - red) / (blue + 6 * red - 7.5 * green + 1e-5)

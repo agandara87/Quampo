@@ -8,7 +8,7 @@ import openai
 import requests
 from datetime import datetime
 
-openai.api_key = "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"
+#openai.api_key = "sk-proj-"
 OPENWEATHER_API_KEY = "fa977f2964c89bf890b1502681dfa742"
 
 system_prompt_llm = """Sos un asesor técnico agrónomo digital que trabaja para Quampo...

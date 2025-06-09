@@ -19,13 +19,22 @@ if uploaded_file:
     fecha_siembra = st.date_input("📅 Fecha de siembra", datetime.today())
 
     if st.button("Generar informe"):
-        prom, idx, tipo = procesar_imagen("temp_image.tif")
+        # Procesar imagen
+        prom, idx, tipo, metadata = procesar_imagen("temp_image.tif")
+
+        # Mostrar información básica de la imagen
+        st.info(f"📷 Tipo de imagen: {tipo} | Bandas detectadas: {metadata['band_count']}")
+        if metadata["has_nir"]:
+            st.success("✅ Banda NIR detectada correctamente.")
+        else:
+            st.warning("⚠️ No se detectó banda NIR. El NDVI es solo una estimación basada en RGB.")
+
+        # Generar informe
         informe = generar_informe(prom, str(fecha), cultivo, ubicacion, tipo, str(fecha_siembra))
 
-        # Mostrar advertencias visibles
+        # Advertencias clave
         if tipo == "RGB":
             st.warning("⚠️ Imagen RGB detectada. El NDVI fue estimado sin banda NIR. El resultado es solo orientativo.")
-
         if "NDVI" not in prom:
             st.error("🚫 No se pudo calcular NDVI porque falta la banda NIR.")
 

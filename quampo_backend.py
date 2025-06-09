@@ -105,7 +105,8 @@ def generar_informe(prom, fecha, cultivo, ubicacion, tipo, fecha_siembra):
     return "\n".join(resumen)
 
 def generar_informe_llm(informe):
-    response = openai.ChatCompletion.create(
+    client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt_llm},

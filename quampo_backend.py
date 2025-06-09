@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import openai
-import openai
+import os
 import requests
 from datetime import datetime
 

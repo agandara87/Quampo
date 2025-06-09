@@ -9,7 +9,7 @@ import os
 import requests
 from datetime import datetime
 
-#openai.api_key = os.environ.get("OPENAI_API_KEY")  # ¡Clave correcta!
+openai.api_key = os.environ.get("OPENAI_API_KEY")  # ¡Clave correcta!
 OPENWEATHER_API_KEY = "fa977f2964c89bf890b1502681dfa742"
 
 system_prompt_llm = """Sos un asesor técnico agrónomo digital que trabaja para Quampo...
@@ -105,12 +105,10 @@ def generar_informe(prom, fecha, cultivo, ubicacion, tipo, fecha_siembra):
     return "\n".join(resumen)
 
 def generar_informe_llm(informe):
-    client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt_llm},
-            {"role": "user", "content": f"Este es el informe técnico:\n\n{informe}\n\nRedactá un informe agronómico claro y profesional para el productor."}
-        ]
-    )
-    return response.choices[0].message.content.strip()
+    response = openai.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": system_prompt_llm},
+        {"role": "user", "content": f"..."}
+    ]
+)

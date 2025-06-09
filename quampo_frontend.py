@@ -1,7 +1,7 @@
-
 # quampo_frontend.py
 
 import streamlit as st
+import matplotlib.pyplot as plt
 from datetime import datetime
 from quampo_backend import procesar_imagen, generar_informe, generar_informe_llm
 
@@ -21,7 +21,27 @@ if uploaded_file:
     if st.button("Generar informe"):
         prom, idx, tipo = procesar_imagen("temp_image.tif")
         informe = generar_informe(prom, str(fecha), cultivo, ubicacion, tipo, str(fecha_siembra))
+
+        # Mostrar advertencias visibles
+        if tipo == "RGB":
+            st.warning("⚠️ Imagen RGB detectada. El NDVI fue estimado sin banda NIR. El resultado es solo orientativo.")
+
+        if "NDVI" not in prom:
+            st.error("🚫 No se pudo calcular NDVI porque falta la banda NIR.")
+
+        # Mostrar informe técnico
         st.subheader("✅ Informe técnico")
         st.text(informe)
+
+        # Mostrar informe LLM
         st.subheader("🤖 Informe agronómico profesional")
         st.markdown(generar_informe_llm(informe))
+
+        # Mostrar imagen NDVI
+        if "NDVI" in idx:
+            fig, ax = plt.subplots()
+            im = ax.imshow(idx["NDVI"], cmap="RdYlGn")
+            ax.axis("off")
+            plt.colorbar(im, ax=ax)
+            st.subheader("🖼 Mapa NDVI")
+            st.pyplot(fig)

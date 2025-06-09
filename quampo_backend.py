@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import openai
 import os
-from google.colab import files
 import requests
 from datetime import datetime
 from openai import OpenAI

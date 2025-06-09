@@ -194,30 +194,3 @@ def generar_informe_llm(informe):
         ]
     )
     return response.choices[0].message.content.strip()
-
-# 🖼 Ejecución principal
-print("🌱 Bienvenido a Quampo. Subí tu imagen satelital.")
-uploaded = files.upload()
-path = next(iter(uploaded.keys()))
-
-fecha = input("📅 Fecha de la imagen (YYYY-MM-DD): ")
-cultivo = input("🌾 Cultivo (ej. Maíz, Soja): ")
-ubicacion = input("📍 Ubicación (ej. Pergamino): ")
-fecha_siembra = input("📅 Fecha de siembra (YYYY-MM-DD): ")
-
-prom, idx, tipo = procesar_imagen(path)
-informe = generar_informe(prom, fecha, cultivo, ubicacion, tipo, fecha_siembra)
-
-print("\n✅ Informe automático:\n")
-print(informe)
-
-print("\n🤖 Informe redactado por Quampo.com\n")
-print(generar_informe_llm(informe))
-
-# 🌈 NDVI visual
-if "NDVI" in idx:
-    plt.imshow(idx["NDVI"], cmap="RdYlGn")
-    plt.title("🖼 NDVI Map")
-    plt.axis("off")
-    plt.colorbar()
-    plt.show()

@@ -149,27 +149,11 @@ def procesar_imagen(path):
             "GNDVI": float(np.nanmean(gndvi))
         })
 
-    return promedios, indices, tipo
+    return promedios, indices, tipo, {
+        "band_count": bandas,
+        "has_nir": nir is not None
+    }
 )
-
-    # Otros índices (se pueden calcular igual con RGB)
-    evi = 2.5 * (blue - red) / (blue + 6 * red - 7.5 * green + 1e-5)
-    ndwi = (green - blue) / (green + blue + 1e-5)
-    savi = 1.5 * (red - blue) / (red + blue + 0.5)
-    gndvi = (green - red) / (green + red + 1e-5)
-
-    indices["EVI"] = evi
-    indices["NDWI"] = ndwi
-    indices["SAVI"] = savi
-    indices["GNDVI"] = gndvi
-
-    promedios["EVI"] = float(np.nanmean(evi))
-    promedios["NDWI"] = float(np.nanmean(ndwi))
-    promedios["SAVI"] = float(np.nanmean(savi))
-    promedios["GNDVI"] = float(np.nanmean(gndvi))
-
-    return promedios, indices, tipo
-
 
 # 📊 Interpretar índice
 def interpretar_indice(valor, nombre):

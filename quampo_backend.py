@@ -11,7 +11,7 @@ from datetime import datetime
 from openai import OpenAI
 
 # 🔐 Configurar tu API Key de OpenAI
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 # 🌦 API Key de OpenWeatherMap
 OPENWEATHER_API_KEY = "fa977f2964c89bf890b1502681dfa742"
 

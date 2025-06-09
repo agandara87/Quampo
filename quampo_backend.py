@@ -104,7 +104,7 @@ def generar_informe(prom, fecha, cultivo, ubicacion, tipo, fecha_siembra):
     return "\n".join(resumen)
 
 def generar_informe_llm(informe):
-    client = openai.OpenAI(api_key="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")
+    #client = openai.OpenAI(api_key="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")
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[

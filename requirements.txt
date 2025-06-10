@@ -1,7 +1,7 @@
 opencv-python-headless
-numpy
 matplotlib
 requests
 streamlit
 openai>=1.4.0
-rasterio==1.2.10
+rasterio==1.3.9
+numpy==1.23.5

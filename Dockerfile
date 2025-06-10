@@ -24,4 +24,5 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ["streamlit", "run", "quampo_frontend.py"]
+CMD ["streamlit", "run", "quampo_frontend.py", "--server.port=7860", "--server.address=0.0.0.0"]
+

@@ -1,28 +1,42 @@
-FROM python:3.10-slim
+# --------------------------------------
+# Quampo – Dockerfile (HF Space)
+# --------------------------------------
 
-# Evitar interacción al instalar tzdata
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=America/Argentina/Buenos_Aires
+# 1) Imagen base: Debian bookworm slim con Python 3.11
+FROM python:3.11-slim-bookworm
 
-# Instalar dependencias de rasterio y zona horaria
-RUN apt-get update && apt-get install -y \
-    g++ \
-    python3-dev \
-    libgdal-dev \
-    tzdata \
-    && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
-    && dpkg-reconfigure --frontend noninteractive tzdata \
+# 2) Dependencias del sistema necesarias para GDAL/Rasterio,
+#    proyecciones y compilación de wheels nativos.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gdal-bin libgdal-dev python3-gdal \
+        proj-bin libproj-dev \
+        build-essential gcc g++ make \
+        libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
-# Crear directorio de la app
+# 3) Variables de entorno de GDAL y Proj (evita “data not found”)
+ENV GDAL_DATA=/usr/share/gdal
+ENV PROJ_LIB=/usr/share/proj
+
+# 4) Configuración de carpetas temporales (HF no permite HOME=/root)
+ENV HOME=/tmp
+ENV STREAMLIT_GLOBAL_CONFIG_DIR=/tmp/.streamlit
+ENV MPLCONFIGDIR=/tmp/.matplotlib
+ENV BROWSER_GATHERUSAGESTATS=false
+
+# 5) Puerto por defecto para correr localmente (HF lo sobrescribe)
+ENV PORT=7860
+
+# 6) Instalo primero requirements para cachear capa de pip
+COPY requirements.txt /tmp/
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r /tmp/requirements.txt
+
+# 7) Copio el resto de la app
+COPY . /app
 WORKDIR /app
 
-# Copiar requerimientos y app
-COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
-COPY . .
-
-CMD ["streamlit", "run", "quampo_frontend.py", "--server.port=7860", "--server.address=0.0.0.0"]
-
+# 8) Comando de arranque: forma *shell* para que $PORT se expanda
+CMD streamlit run quampo_frontend.py \
+    --server.port $PORT \
+    --server.address 0.0.0.0

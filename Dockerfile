@@ -1,6 +1,10 @@
 # Imagen base estable con GDAL y Python
 FROM osgeo/gdal:ubuntu-full-3.6.2
 
+# Seteamos la zona horaria para evitar prompts interactivos como el de tu screenshot
+ENV TZ=America/Argentina/Buenos_Aires
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezon
+
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
     python3-pip \

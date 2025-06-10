@@ -153,7 +153,6 @@ def procesar_imagen(path):
         "band_count": bandas,
         "has_nir": nir is not None
     }
-)
 
 # 📊 Interpretar índice
 def interpretar_indice(valor, nombre):

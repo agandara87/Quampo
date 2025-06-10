@@ -1,31 +1,27 @@
-# Imagen base estable con GDAL y Python
-FROM osgeo/gdal:ubuntu-full-3.6.2
+FROM python:3.10-slim
 
-# Seteamos la zona horaria para evitar prompts interactivos como el de tu screenshot
+# Evitar interacción al instalar tzdata
+ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Argentina/Buenos_Aires
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezon
 
-# Instalar dependencias del sistema
+# Instalar dependencias de rasterio y zona horaria
 RUN apt-get update && apt-get install -y \
-    python3-pip \
-    python3-opencv \
-    python3-numpy \
-    python3-matplotlib \
-    libgl1-mesa-glx \
+    g++ \
+    python3-dev \
+    libgdal-dev \
+    tzdata \
+    && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# Establecer variables necesarias para Rasterio
-ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
-ENV C_INCLUDE_PATH=/usr/include/gdal
-ENV GDAL_VERSION=3.6.2
-
-# Crear directorio y copiar código
+# Crear directorio de la app
 WORKDIR /app
-COPY . /app
 
-# Instalar dependencias de Python
+# Copiar requerimientos y app
+COPY requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Comando para ejecutar Streamlit
-CMD ["streamlit", "run", "quampo_frontend.py", "--server.port=7860", "--server.address=0.0.0.0"]
+COPY . .
+
+CMD ["streamlit", "run", "quampo_frontend.py"]

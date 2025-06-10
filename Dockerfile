@@ -1,5 +1,5 @@
 # Imagen base con GDAL y Python
-FROM osgeo/gdal:ubuntu-small-latest
+FROM osgeo/gdal:alpine-small-latest
 
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \

@@ -10,140 +10,133 @@ from quampo_backend import (
     generar_informe,
     generar_informe_llm,
     geocode_location,
-    get_satellite_image_dates,
-    get_sentinel_url,
-    download_sentinel_image 
+    download_gee_image
 )
 
 # ────────────────────────────────────────────────────────────────────
-# Configuración entorno Streamlit
+# Configuración del entorno Streamlit
 tmp_dir = tempfile.gettempdir()
 os.environ["STREAMLIT_GLOBAL_CONFIG_DIR"] = f"{tmp_dir}/.streamlit"
 os.environ["MPLCONFIGDIR"] = f"{tmp_dir}/.matplotlib"
 os.environ["BROWSER_GATHERUSAGESTATS"] = "false"
 
 st.set_page_config(page_title="Quampo – Análisis Satelital", layout="centered")
-st.title("🛰️ Quampo – Análisis Satelital de Cultivos")
+st.title("🛰️ Quanmpo – Análisis Satelital de Cultivos")
 st.markdown(
-    "Sube tu imagen TIFF georreferenciada o, si no tienes imagen, deja en blanco y se usará Sentinel Hub."
+    "Sube tu TIFF georreferenciado o, si no subes nada, usaremos GEE para descargar Sentinel-2 directamente."
 )
 
-# 1) Subir imagen satelital (solo TIFF para geoespacial)
+# 1) Carga opcional de imagen TIFF
 uploaded = st.file_uploader(
-    "📤 Imagen satelital (.tif, .tiff). Si no subes nada, se usará Sentinel Hub según la ubicación y fecha.",
+    "📤 Imagen satelital (.tif, .tiff)",
     type=["tif", "tiff"]
 )
 if uploaded and "img_bytes" not in st.session_state:
-    st.session_state["img_bytes"] = uploaded.read()
-    st.session_state["img_name"] = uploaded.name
-    size_kb = len(st.session_state["img_bytes"]) / 1024
-    st.success(f"Archivo **{st.session_state['img_name']}** cargado ({size_kb:.1f} KB)")
+    st.session_state.img_bytes = uploaded.read()
+    st.session_state.img_name = uploaded.name
+    size_kb = len(st.session_state.img_bytes) / 1024
+    st.success(f"Archivo **{st.session_state.img_name}** cargado ({size_kb:.1f} KB)")
     try:
-        st.image(st.session_state["img_bytes"], caption="Imagen cargada")
+        st.image(st.session_state.img_bytes, caption="Imagen cargada")
     except Exception:
         pass
 
-# 2) Metadatos
+# 2) Parámetros de análisis
 date_col, meta_col = st.columns(2)
 with date_col:
-    fecha = st.date_input("📅 Fecha de la imagen / análisis", datetime.today().date())
-    cultivo = st.text_input("🌾 Cultivo (ej. Maíz, Soja)", "")
+    fecha = st.date_input("📅 Fecha de referencia", datetime.today().date())
+    cultivo = st.text_input("🌾 Cultivo (ej. Maíz, Soja, Barbecho)", "")
 with meta_col:
     ubicacion = st.text_input("📍 Localidad (ciudad/región)", "")
-    fecha_siembra = st.date_input("🌱 Fecha de siembra", datetime.today().date() - timedelta(days=30))
+    maps_link = st.text_input("🔗 Enlace de Google Maps (opcional)", "")
+    fecha_siembra = st.date_input(
+        "🌱 Fecha de siembra",
+        datetime.today().date() - timedelta(days=30)
+    )
 
-# 3) Botones
+# 3) Parámetros GEE (solo para descarga)
+col1, col2 = st.columns(2)
+with col1:
+    window = st.slider("± Días alrededor de la fecha", 1, 30, 14)
+with col2:
+    cloud = st.slider("Nubosidad máx. (%)", 0, 100, 20)
+
+# 4) Botones de acción
 gen_col, reset_col = st.columns([1, 1])
-generar = gen_col.button("Generar informe")
-resetear = reset_col.button("🔄 Resetear todo", type="secondary")
-if resetear:
+if reset_col.button("🔄 Resetear todo", type="secondary"):
     st.session_state.clear()
     st.experimental_rerun()
+generar = gen_col.button("Generar informe")
 
-# 4) Flujo principal
+# 5) Flujo principal
 if generar:
     # Validaciones
     if not cultivo:
         st.error("⚠️ Ingresa el nombre del cultivo.")
         st.stop()
-    if not ubicacion:
-        st.error("⚠️ Ingresa la localidad.")
+    if not ubicacion and not maps_link:
+        st.error("⚠️ Ingresa la localidad o pega un enlace de Google Maps.")
         st.stop()
 
-    # Procesar imagen subida o Sentinel
+    # 5.1) Obtener imagen (TIFF local o GEE)
     if "img_bytes" in st.session_state:
-        # Imagen subida
-        tmp_path = pathlib.Path(tempfile.gettempdir()) / st.session_state["img_name"]
+        tmp_path = pathlib.Path(tmp_dir) / st.session_state.img_name
         with open(tmp_path, "wb") as f:
-            f.write(st.session_state["img_bytes"])
-        st.info("⏳ Procesando imagen subida...")
+            f.write(st.session_state.img_bytes)
+        st.info("⏳ Procesando imagen TIFF subida…")
         try:
             promedios, indices, tipo, meta = procesar_imagen(str(tmp_path))
-            fuente = f"Imagen subida: {st.session_state['img_name']}"
-            # Aviso si no georef
-            if meta.get('crs') is None:
-                st.warning("La imagen subida no tiene georreferenciación; el mapa NDVI se mostrará en píxeles y se usará la ubicación manual para pronóstico/clima.")
+            fuente = f"Imagen subida: {st.session_state.img_name}"
+            if not meta.get('crs'):
+                st.warning("La imagen no tiene georreferenciación; el mapa NDVI no incluirá coordenadas reales.")
         except Exception as e:
             st.error(f"Error procesando la imagen subida: {e}")
             st.stop()
-
     else:
-        # --- Rama: usar Sentinel Hub ---
-        st.info("🔍 No se subió imagen. Se intentará usar Sentinel Hub según ubicación y fecha.")
-        # 1) Geocodificar
-        try:
-            lat, lon = geocode_location(ubicacion)
-        except Exception as e:
-            st.error(f"Error geocodificando '{ubicacion}': {e}")
-            st.stop()
+        # Extraer coordenadas de Google Maps URL o geocoding de texto
+        if maps_link:
+            import re
+            m = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', maps_link)
+            if not m:
+                st.error("URL de Google Maps inválida: no encontré '@lat,lon'.")
+                st.stop()
+            lat, lon = float(m.group(1)), float(m.group(2))
+        else:
+            st.info("🔍 Geocoding de la localidad…")
+            try:
+                lat, lon = geocode_location(ubicacion)
+            except Exception as e:
+                st.error(f"Error geocodificando '{ubicacion}': {e}")
+                st.stop()
 
+        # Descargar y apilar GEE
         fecha_str = fecha.strftime("%Y-%m-%d")
-
-        # 2) Mostrar URLs encontradas (opcional, solo para referencia)
-        imgs = get_satellite_image_dates(lat, lon)
-        st.write("URLs de imágenes satelitales (referencia):")
-        st.write(f"- Actual: {imgs.get('actual') or 'No encontrada'}")
-        st.write(f"- Anterior (~30d): {imgs.get('anterior') or 'No encontrada'}")
-        st.write(f"- Hace un año: {imgs.get('anio_atras') or 'No encontrada'}")
-
-        # 3) Descargar la imagen “actual” usando la función del backend
-        st.info("⏳ Descargando imagen Sentinel Hub localmente...")
-        ruta_local = download_sentinel_image(lat, lon, fecha_str, size_m=5000, resolution=10, window_days=7)
+        st.info("⌛️ Descargando imagen con GEE…")
+        ruta_local, meta_gee = download_gee_image(lat, lon, fecha_str, window_days=window, max_cloud_pct=cloud)
         if not ruta_local:
-            st.warning("No se encontró o no se pudo descargar imagen Sentinel en ±7 días de la fecha seleccionada.")
+            st.error("No se encontró imagen Sentinel-2 …")
             st.stop()
-        st.success(f"Imagen descargada localmente: {ruta_local}")
-
-        # 4) Procesar la imagen descargada
-        st.info("⏳ Procesando imagen Sentinel descargada...")
+        st.write(f"{meta_gee['notice']} (fecha real: {meta_gee['actual_date']})")
+        st.success(f"Imagen descargada: {pathlib.Path(ruta_local).name} (Fecha real: {meta_gee['actual_date']}, Nubosidad {meta_gee['cloud_pct']}%)")
+        st.info("⌛️ Procesando imagen descargada…")
         try:
-            promedios, indices, tipo, meta = procesar_imagen(str(ruta_local))
-            fuente = f"Sentinel Hub: fecha {fecha_str}"
+            promedios, indices, tipo, meta = procesar_imagen(ruta_local)
+            fuente = f"GEE Sentinel-2: {meta_gee['actual_date']}"
         except Exception as e:
-            st.error(f"Error procesando imagen Sentinel: {e}")
+            st.error(f"Error procesando la imagen descargada: {e}")
             st.stop()
 
-
-    # Generar informe técnico
-    st.info("📝 Generando informe técnico...")
+    # 5.2) Generar informe técnico
+    st.info("📝 Generando informe técnico…")
     try:
-        informe_tecnico = generar_informe(
-            promedios,
-            fecha.strftime("%Y-%m-%d"),
-            cultivo,
-            ubicacion,
-            tipo,
-            fecha_siembra.strftime("%Y-%m-%d"),
-            fuente
-        )
+        informe_tecnico = generar_informe(promedios, fecha.strftime("%Y-%m-%d"), cultivo, ubicacion, tipo, fecha_siembra.strftime("%Y-%m-%d"), fuente)
     except Exception as e:
         st.error(f"Error generando informe: {e}")
         st.stop()
-
     st.subheader("✅ Informe técnico completo")
     st.markdown(f"```\n{informe_tecnico}\n```")
 
-    # Informe LLM
+    # 5.3) Informe agronómico LLM
     st.subheader("🤖 Informe agronómico profesional")
     with st.spinner("Llamando a la LLM..."):
         try:
@@ -152,30 +145,31 @@ if generar:
         except Exception as e:
             st.error(f"Error al generar informe LLM: {e}")
 
-    # Visualización NDVI
-    key = "NDVI" if "NDVI" in indices else "NDVI_orientativo"
-    arr_ndvi = indices.get(key)
+    # 5.4) Mapa NDVI
+    if "NDVI" in indices:
+        arr_ndvi = indices["NDVI"]
+    elif "NDVI_orientativo" in indices:
+        arr_ndvi = indices["NDVI_orientativo"]
+    else:
+        arr_ndvi = None
     if arr_ndvi is None:
-        st.warning("No se encontró índice NDVI en los resultados.")
+        st.warning("No se encontró índice NDVI para visualizar.")
     else:
         fig, ax = plt.subplots()
-        extent = meta.get('extent', None)
-        if extent:
-            im = ax.imshow(arr_ndvi, extent=extent, origin='upper')
-            ax.set_title("Mapa NDVI")
-        else:
-            im = ax.imshow(arr_ndvi, origin='upper')
-            ax.set_title("Mapa NDVI (sin georreferenciación)")
-        ax.axis('off')
+        extent = None
+        if meta.get("bounds"):
+            b = meta["bounds"]
+            extent = [b.left, b.right, b.bottom, b.top]
+        im = ax.imshow(arr_ndvi, extent=extent, origin='upper') if extent else ax.imshow(arr_ndvi, origin='upper')
+        ax.set_title("Mapa NDVI")
+        ax.axis("off")
         plt.colorbar(im, ax=ax, fraction=0.04)
         st.subheader("🗺️ Mapa NDVI")
         st.pyplot(fig)
 
-    # Estadísticas de promedios
+    # 5.5) Estadísticas de índices promedio
     st.subheader("📊 Estadísticas de índices promedio")
-    stats_md = "| Índice | Valor promedio |\n|---|---:|\n"
+    stats_md = "| Índice | Promedio |\n|---|---:|\n"
     for k, v in promedios.items():
         stats_md += f"| {k} | {v:.3f} |\n"
     st.markdown(stats_md)
-
-    # Fin del flujo

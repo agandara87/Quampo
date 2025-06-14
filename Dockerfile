@@ -23,6 +23,7 @@ ENV HOME=/tmp
 ENV STREAMLIT_GLOBAL_CONFIG_DIR=/tmp/.streamlit
 ENV MPLCONFIGDIR=/tmp/.matplotlib
 ENV BROWSER_GATHERUSAGESTATS=false
+ENV STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 
 # 5) Puerto por defecto para correr localmente (HF lo sobrescribe)
 ENV PORT=7860
